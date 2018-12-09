@@ -129,7 +129,10 @@ template<typename T>
 uint8_t *deconvert(const T &value, uint8_t *data) {
     memcpy(data, (uint8_t *) (&value), sizeof(T));
     for (auto i = 0; i < sizeof(T) / 2; i++) {
-        std::swap(data[i], data[sizeof(T) - 1 - i]);
+        T obj = data[i];
+        data[i] = data[sizeof(T) - 1 - i];
+        data[sizeof(T) - 1 - i] = obj;
+//        std::swap(data[i], data[sizeof(T) - 1 - i]);
     }
     return data;
 }
@@ -159,6 +162,16 @@ inline const uint8_t *get_block_with_value(T value) {
         value >>= 8;
     }
     return block;
+}
+
+template<typename T>
+inline T reverse_bytes(T value) {
+    static auto memory = new uint8_t[sizeof(T)];
+    memcpy(memory, (uint8_t*)(&value), sizeof(T));
+    for (size_t i = 0; i < sizeof(T) / 2; i++) {
+        std::swap(memory[i], memory[sizeof(T) - 1 - i]);
+    }
+    return *((T*)(memory));
 }
 
 };

@@ -12,14 +12,17 @@ class Stribog_hash {
     inline uint8_t *linear_transformation(uint8_t *block128) const {
         static const auto &transform_matrix = constants::linear_transformation::get_linear_matrix();
 
-        auto value128 = utils::convert<__uint128_t>(block128);
-
-        auto value1 = (uint64_t) (value128 >> 64);
-        auto value2 = (uint64_t) value128;
+        auto value1 = (uint8_t) block128[7];
+        auto value2 = (uint8_t) block128[15];
 
         uint64_t result1 = 0;
         uint64_t result2 = 0;
         for (int i = 0; i < 64; i++) {
+            if (i % 8 == 0) {
+                value1 = block128[7 - i / 8];
+                value2 = block128[15 - i / 8];
+            }
+
             const auto &value = transform_matrix[i];
             if (value1 & 1) {
                 result1 ^= value;
@@ -30,8 +33,8 @@ class Stribog_hash {
             value1 >>= 1;
             value2 >>= 1;
         }
-        auto result = ((__uint128_t) (result1) << 64) | result2;
-        utils::deconvert<__uint128_t>(result, block128);
+        memcpy(block128, (uint8_t*)(&result1), 8);
+        memcpy(block128 + 8, (uint8_t*)(&result2), 8);
         return block128;
     }
 

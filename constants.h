@@ -58,11 +58,14 @@ inline const uint64_t* get_linear_matrix() {
         matrix = new uint64_t[64];
         for (int i = 0; i < 64; i++) {
             matrix[63 - i] = utils::parse_hex<uint64_t>(string_matrix[i]);
+            //Теперь необходимо перевернуть байты
+            matrix[63 - i] = utils::reverse_bytes(matrix[63 - i]);
         }
     }
-
     return matrix;
 }
+
+static uint64_t linear_transform_matrix[8][256];
 
 };
 
