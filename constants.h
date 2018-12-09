@@ -11,7 +11,7 @@
 namespace constants {
 
 namespace pi_transformation {
-static int pi[] = {
+static uint8_t pi[] = {
         252, 238, 221, 17, 207, 110, 49, 22, 251, 196, 250, 218, 35, 197, 4, 77, 233, 119, 240, 219, 147, 46,
         153, 186, 23, 54, 241, 187, 20, 205, 95, 193, 249, 24, 101, 90, 226, 92, 239, 33, 129, 28, 60, 66,
         139, 1, 142, 79, 5, 132, 2, 174, 227, 106, 143, 160, 6, 11, 237, 152, 127, 212, 211, 31, 235, 52, 44,
@@ -27,7 +27,7 @@ static int pi[] = {
 };
 
 namespace tau_transformation {
-static int tau[] = {
+static uint8_t tau[] = {
         0, 8, 16, 24, 32, 40, 48, 56, 1, 9, 17, 25, 33, 41, 49, 57, 2, 10, 18, 26, 34, 42, 50, 58, 3, 11, 19,
         27, 35, 43, 51, 59, 4, 12, 20, 28, 36, 44, 52, 60, 5, 13, 21, 29, 37, 45, 53, 61, 6, 14, 22, 30, 38,
         46, 54, 62, 7, 15, 23, 31, 39, 47, 55, 63};
@@ -52,17 +52,13 @@ static const char* string_matrix[] = {
         "70a6a56e2440598e", "3853dc371220a247", "1ca76e95091051ad", "0edd37c48a08a6d8",
         "07e095624504536c", "8d70c431ac02a736", "c83862965601dd1b", "641c314b2b8ee083"};
 
-inline const std::array<uint64_t, 64> get_linear_matrix() {
-    static std::array<uint64_t, 64> matrix;
-    static bool initialized = false;
-    if (!initialized) {
+inline const uint64_t* get_linear_matrix() {
+    static uint64_t* matrix = nullptr;
+    if (!matrix) {
+        matrix = new uint64_t[64];
         for (int i = 0; i < 64; i++) {
             matrix[63 - i] = utils::parse_hex<uint64_t>(string_matrix[i]);
         }
-//        for(const auto& value : string_matrix) {
-//            matrix.push_back(utils::parse_hex<uint64_t>(value));
-//        }
-//        std::reverse(matrix.begin(), matrix.end());
     }
 
     return matrix;
@@ -87,17 +83,16 @@ static const char* c_values[] = {
         "378ee767f11631bad21380b00449b17acda43c32bcdf1d77f82012d430219f9b5d80ef9d1891cc86e71da4aa88e12852faf417d5d9b21b9948bc924af11bd720"
     };
 
-inline const std::vector<std::array<__uint128_t, 4> > get_iteration_constants() {
-    static std::vector<std::array<__uint128_t, 4> > matrix;
-    if (matrix.empty()) {
-        for(const auto& value : c_values) {
-            matrix.emplace_back();
-            for (int i = 0; i < 4; i++) {
-                matrix.back()[i] = utils::parse_hex<__uint128_t>(value + 32 * i);
+inline const uint8_t* get_iteration_constants() {
+    static uint8_t* matrix = nullptr;
+    if (!matrix) {
+        matrix = new uint8_t[64 * 12];
+        for (int row_id = 0; row_id < 12; row_id++) {
+            for (int i = 0; i < 64; i++) {
+                matrix[row_id * 64 + i] = utils::parse_hex<uint8_t>(c_values[row_id] + 2 * i);
             }
         }
     }
-
     return matrix;
 }
 

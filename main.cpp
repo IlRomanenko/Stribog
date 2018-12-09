@@ -9,15 +9,18 @@ using __uint512_t = std::array<__uint128_t, 4>;
 
 class Stribog_hash {
 
-    __uint128_t linear_transformation(const __uint128_t &value128) const {
+    inline uint8_t *linear_transformation(uint8_t *block128) const {
         static const auto &transform_matrix = constants::linear_transformation::get_linear_matrix();
-        auto value1 = (uint64_t)(value128 >> 64);
-        auto value2 = (uint64_t)value128;
+
+        auto value128 = utils::convert<__uint128_t>(block128);
+
+        auto value1 = (uint64_t) (value128 >> 64);
+        auto value2 = (uint64_t) value128;
 
         uint64_t result1 = 0;
         uint64_t result2 = 0;
         for (int i = 0; i < 64; i++) {
-            const auto& value = transform_matrix[i];
+            const auto &value = transform_matrix[i];
             if (value1 & 1) {
                 result1 ^= value;
             }
@@ -27,135 +30,115 @@ class Stribog_hash {
             value1 >>= 1;
             value2 >>= 1;
         }
-        auto result = ((__uint128_t)(result1) << 64) | result2;
-        return result;
+        auto result = ((__uint128_t) (result1) << 64) | result2;
+        utils::deconvert<__uint128_t>(result, block128);
+        return block128;
     }
 
-    __uint128_t pi_transformation(const __uint128_t &value) const {
+    inline uint8_t *pi_transformation(uint8_t *block128) const {
         static const auto &pi = constants::pi_transformation::pi;
-
-        __uint128_t result = 0;
-        __uint128_t mask = 0b11111111;
-        size_t offset = 0;
         for (int i = 0; i < 16; i++) {
-            auto byte = (uint8_t) ((value & mask) >> offset);
-            result |= (__uint128_t) pi[byte] << offset;
-            mask <<= 8;
-            offset += 8;
+            block128[i] = pi[block128[i]];
         }
-
-        return result;
+        return block128;
     }
 
-    __uint512_t s_conversion(const __uint512_t &block) const {
-        __uint512_t result;
+    uint8_t *s_conversion(uint8_t *block512) const {
         for (int i = 0; i < 4; i++) {
-            result[i] = pi_transformation(block[i]);
+            pi_transformation(block512 + 16 * i);
         }
-        return result;
+        return block512;
     }
 
-    __uint512_t p_conversion(const __uint512_t &block) const {
+    uint8_t *p_conversion(uint8_t *block512) const {
         static const auto &tau = constants::tau_transformation::tau;
+        static uint8_t arr[64];
 
-        std::array<uint8_t, 64> bytes = {};
-        for (int i = 3; i >= 0; i--) {
-            auto value = block[i];
-            for (int j = 0; j < 16; j++) {
-                bytes[16 * i + (15 - j)] = ((uint8_t) value);
-                value >>= 8;
-            }
-        }
+        memcpy(arr, block512, 64);
 
-        std::array<uint8_t, 64> replaced = {};
         for (int i = 0; i < 64; i++) {
-            replaced[i] = bytes[tau[i]];
+            block512[i] = arr[tau[i]];
         }
-
-        __uint512_t result;
-        for (int i = 3; i >= 0; i--) {
-            __uint128_t value = 0;
-            for (int j = 0; j < 16; j++) {
-                value <<= 8;
-                value |= replaced[j + (3 - i) * 16];
-            }
-            result[3 - i] = value;
-        }
-
-        return result;
+        return block512;
     }
 
-    __uint512_t l_conversion(const __uint512_t &block) const {
-        __uint512_t result;
+    uint8_t *l_conversion(uint8_t *block512) const {
         for (int i = 0; i < 4; i++) {
-            result[i] = linear_transformation(block[i]);
+             linear_transformation(block512 + 16 * i);
         }
-        return result;
+        return block512;
     }
 
-    __uint512_t xor_conversion(const __uint512_t &block1, const __uint512_t &block2) const {
-        __uint512_t result;
-        for (auto i = 0; i < block1.size(); i++) {
-            result[i] = block1[i] ^ block2[i];
+    uint8_t *xor_conversion(uint8_t *block512_1, const uint8_t *block512_2) const {
+        for (auto i = 0; i < 64; i++) {
+            block512_1[i] = block512_1[i] ^ block512_2[i];
         }
-        return result;
+        return block512_1;
     }
 
-    __uint512_t lps_function(const __uint512_t &block) const {
-        return l_conversion(p_conversion(s_conversion(block)));
+    uint8_t *lps_function(uint8_t *block512) const {
+        return l_conversion(p_conversion(s_conversion(block512)));
     }
 
-    __uint512_t e_function(const __uint512_t &h, const __uint512_t &m) const {
+    uint8_t *e_function(const uint8_t *h512, const uint8_t *m512) const {
         const auto &c_values = constants::iteration_constants::get_iteration_constants();
-        auto key = h;
-        auto value = xor_conversion(key, m);
+        auto key = utils::copy<64>(h512);
+        auto value = xor_conversion(utils::copy<64>(key), m512);
 
 //        std::cout << "e_function" << std::endl;
-        //utils::print_hex_array(key, "key");
-        //utils::print_hex_array(c_values[0], "c_value[0]");
-        //utils::print_hex_array(value, "X[k1](m)");
+//        utils::print_hex_array(key, "key");
+//        utils::print_hex_array(c_values, "c_value[0]");
+//        utils::print_hex_array(value, "X[k1](m)");
 
         for (int i = 1; i < 13; i++) {
-            //utils::print_hex_array(key, "key on iteration " + std::to_string(i));
-            //utils::print_hex_array(xor_conversion(key, c_values[i - 1]), "key^c[i-1] on iteration " + std::to_string(i));
-            //utils::print_hex_array(s_conversion(xor_conversion(key, c_values[i - 1])), "s(key^c[i-1]) on iteration " + std::to_string(i));
-            //utils::print_hex_array(p_conversion(s_conversion(xor_conversion(key, c_values[i - 1]))), "p(s(key^c[i-1])) on iteration " + std::to_string(i));
-            //utils::print_hex_array(l_conversion(p_conversion(s_conversion(xor_conversion(key, c_values[i - 1])))), "l(p(s(key^c[i-1]))) on iteration " + std::to_string(i));
-            key = lps_function(xor_conversion(key, c_values[i - 1]));
+//            utils::print_hex_array(key, "key on iteration " + std::to_string(i));
+//            utils::print_hex_array(xor_conversion(utils::copy<64>(key), c_values + 64 * (i - 1)), "key^c[i-1] on iteration " + std::to_string(i));
+//            utils::print_hex_array(s_conversion(xor_conversion(utils::copy<64>(key), c_values + 64 * (i - 1))), "s(key^c[i-1]) on iteration " + std::to_string(i));
+//            utils::print_hex_array(p_conversion(s_conversion(xor_conversion(utils::copy<64>(key), c_values + 64 * (i - 1)))), "p(s(key^c[i-1])) on iteration " + std::to_string(i));
+//            utils::print_hex_array(l_conversion(p_conversion(s_conversion(xor_conversion(utils::copy<64>(key), c_values + 64 * (i - 1))))), "l(p(s(key^c[i-1]))) on iteration " + std::to_string(i));
+            key = lps_function(xor_conversion(key, c_values + (i - 1) * 64));
 
-            //utils::print_hex_array(lps_function(value), "value after iteration " + std::to_string(i));
-            value = xor_conversion(key, lps_function(value));
+//            utils::print_hex_array(lps_function(utils::copy<64>(value)), "value after iteration " + std::to_string(i));
+            value = xor_conversion(lps_function(value), key);
         }
         //utils::print_hex_array(value, "value");
         return value;
     }
 
-    __uint512_t g_function(const __uint512_t &h, const __uint512_t &m, const __uint512_t &N) const {
-        //utils::print_hex_array(h, "h");
-        //utils::print_hex_array(N, "N");
-        //utils::print_hex_array(xor_conversion(h, N), "xor h, N");
-        //utils::print_hex_array(s_conversion(xor_conversion(h, N)), "S(H(h, N))");
+    uint8_t *g_function(const uint8_t *h512, const uint8_t *m512, const uint8_t *N512) const {
+//        utils::print_hex_array(h512, "h");
+//        utils::print_hex_array(N512, "N");
+//        utils::print_hex_array(xor_conversion(utils::copy<64>(h512), N512), "xor h, N");
+//        utils::print_hex_array(s_conversion(xor_conversion(utils::copy<64>(h512), N512)), "S(H(h, N))");
 
-        const auto &stage1 = xor_conversion(h, N);
+        const auto &stage1 = xor_conversion(utils::copy<64>(h512), N512);
         const auto &stage2 = lps_function(stage1);
-        //utils::print_hex_array(stage2, "key");
+//        utils::print_hex_array(stage2, "key");
 
-        const auto &stage3 = e_function(stage2, m);
-        const auto &stage4 = xor_conversion(stage3, h);
-        const auto &stage5 = xor_conversion(stage4, m);
+        const auto &stage3 = e_function(stage2, m512);
+        const auto &stage4 = xor_conversion(stage3, h512);
+        const auto &stage5 = xor_conversion(stage4, m512);
         return stage5;
     }
 
-    __uint512_t addition(const __uint512_t &block1, const __uint512_t &block2) const {
-        __uint512_t result = {0, 0, 0, 0};
-        for (int i = 3; i >= 0; i--) {
-            result[i] = block1[i] + block2[i];
+    uint8_t *addition(uint8_t *block512_1, const uint8_t *block512_2) const {
+        for (int i = 63; i >= 0; i--) {
+            block512_1[i] += block512_2[i];
             // проверка на переполнение
-            if (result[i] < block1[i] && i > 0) {
-                result[i - 1] += 1;
+            if (block512_1[i] < block512_2[i] && i > 0) {
+                block512_1[i - 1] += 1;
             }
         }
-        return result;
+//
+//        __uint512_t result = {0, 0, 0, 0};
+//        for (int i = 3; i >= 0; i--) {
+//            result[i] = block1[i] + block2[i];
+//            // проверка на переполнение
+//            if (result[i] < block1[i] && i > 0) {
+//                result[i - 1] += 1;
+//            }
+//        }
+        return block512_1;
     };
 
     std::vector<__uint128_t> right_shifting(const std::vector<__uint128_t> &message, size_t bits_length) const {
@@ -184,7 +167,7 @@ class Stribog_hash {
         return result;
     }
 
-    std::vector<__uint512_t> add_padding_and_group(const std::vector<__uint128_t> &message,
+    std::vector<uint8_t *> add_padding_and_group(const std::vector<__uint128_t> &message,
                                                    size_t bits_length) const {
         std::vector<__uint128_t> message_ = right_shifting(message, bits_length);
 
@@ -208,21 +191,22 @@ class Stribog_hash {
 
         auto total_blocks = message_.size() / 4;
 
-        std::vector<__uint512_t> result;
+        std::vector<uint8_t *> result;
 
         for (auto i = 0; i < total_blocks; i++) {
-            result.emplace_back();
+            result.push_back(new uint8_t[64]);
             for (int j = 0; j < 4; j++) {
-                result.back()[j] = message_[i * 4 + j];
+                utils::deconvert<__uint128_t>(message_[i * 4 + j], result[result.size() - 1] + j * 16);
             }
         }
         return result;
     }
 
 
+
 public:
-    explicit Stribog_hash(__uint512_t IV) {
-        IV_ = IV;
+    explicit Stribog_hash(const uint8_t *IV512) {
+        IV_ = utils::copy<64>(IV512);
     }
 
     /**
@@ -233,38 +217,41 @@ public:
                                   size_t bits_length,
                                   size_t hash_bits = 512) {
         auto grouped_message = add_padding_and_group(message, bits_length);
-        __uint512_t h = IV_;
-        __uint512_t N = {0, 0, 0, 0};
-        __uint512_t Sigma = {0, 0, 0, 0};
+        auto h = utils::copy<64>(IV_);
+        auto N = new uint8_t[64];
+        auto Sigma = new uint8_t[64];
 
         std::reverse(grouped_message.begin(), grouped_message.end());
 
-        //utils::print_hex_array(grouped_message);
+//        utils::print_hex_array(grouped_message);
+
+        static const auto& addition_512 = utils::get_block_with_value<uint64_t, 64>(512);
 
         for (auto i = 0; i < grouped_message.size() - 1; i++) {
             h = g_function(h, grouped_message[i], N);
-            N = addition(N, {0, 0, 0, 512});
+            N = addition(N, addition_512);
             Sigma = addition(Sigma, grouped_message[i]);
         };
 
         h = g_function(h, grouped_message.back(), N);
-        //utils::print_hex_array(h, "h value");
-        N = addition(N, {0, 0, 0, bits_length});
+//        utils::print_hex_array(h, "h value");
+        N = addition(N, utils::get_block_with_value<uint64_t, 64>(bits_length));
         //utils::print_hex_array(N, "N value");
         Sigma = addition(Sigma, grouped_message.back());
         //utils::print_hex_array(Sigma, "Sigma value");
-        h = g_function(h, N, {0, 0, 0, 0});
-        h = g_function(h, Sigma, {0, 0, 0, 0});
+        h = g_function(h, N, utils::empty_block<64>());
+        h = g_function(h, Sigma, utils::empty_block<64>());
 
         if (hash_bits == 256) {
-            h = {h[0], h[1]};
+            return {utils::convert<__uint128_t>(h), utils::convert<__uint128_t>(h + 16)};
         }
-        return {h[0], h[1], h[2], h[3]};
+        return {utils::convert<__uint128_t>(h), utils::convert<__uint128_t>(h + 16),
+                utils::convert<__uint128_t>(h + 16 * 2), utils::convert<__uint128_t>(h + 16 * 3)};
     }
 
 private:
 
-    __uint512_t IV_;
+    uint8_t *IV_;
 };
 
 void test_utils() {
@@ -277,7 +264,7 @@ void test_stribog() {
 
     std::cout << std::endl << "test_stribog" << std::endl << std::endl;
 
-    Stribog_hash stribog({0, 0, 0, 0});
+    Stribog_hash stribog(utils::empty_block<64>());
     const char *message_str = "323130393837363534333231303938373635343332313039383736353433323130393837363534333231303938373635343332313039383736353433323130\0";
 
     auto message_length = strlen(message_str);
@@ -314,7 +301,6 @@ void test_stribog() {
 int main() {
 
     test_utils();
-
     test_stribog();
 
     return 0;

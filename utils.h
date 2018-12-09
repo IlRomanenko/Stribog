@@ -7,44 +7,44 @@
 #include <cstring>
 #include <algorithm>
 
-using block_t = uint8_t*;
+using block_t = uint8_t *;
 
 namespace utils {
 
 template<typename T>
-T parse_hex(const std::string& hex_str) {
+T parse_hex(const std::string &hex_str) {
     size_t size = std::min(hex_str.length(), sizeof(T) * 2);
 
     T result = 0;
     for (size_t i = 0; i < size; i++) {
-        const auto& chr = (char)tolower(hex_str[i]);
+        const auto &chr = (char) tolower(hex_str[i]);
         result <<= 4;
         if (isdigit(chr)) {
-            result |= (uint8_t)(chr - '0');
+            result |= (uint8_t) (chr - '0');
         } else {
-            result |= (uint8_t)(chr - 'a' + 10);
+            result |= (uint8_t) (chr - 'a' + 10);
         }
     }
     return result;
 }
 
 template<typename T>
-void print_hex(T value, std::string message="", bool need_flush=true) {
+void print_hex(T value, std::string message = "", bool need_flush = true) {
     size_t size = sizeof(T);
 
     auto convert_to_hex = [](int x) {
         char chr;
         if (x < 10) {
-            chr = (char)(x + '0');
+            chr = (char) (x + '0');
         } else {
-            chr = (char)(x + 'a' - 10);
+            chr = (char) (x + 'a' - 10);
         }
         return chr;
     };
 
     std::string result;
     for (size_t i = 0; i < 2 * size; i++) {
-        auto byte = (uint8_t)value & 0b1111;
+        auto byte = (uint8_t) value & 0b1111;
         value >>= 4;
         result += convert_to_hex(byte);
     }
@@ -57,7 +57,7 @@ void print_hex(T value, std::string message="", bool need_flush=true) {
 }
 
 template<typename T>
-void print_hex_array(const T &arr, const std::string& msg="", int level=0) {
+void print_hex_array(const T arr, const std::string &msg = "", int level = 0) {
     if (level == 0) {
         std::cout << msg << std::endl;
     }
@@ -69,12 +69,96 @@ void print_hex_array(const T &arr, const std::string& msg="", int level=0) {
 }
 
 template<>
-void print_hex_array(const __uint128_t &arr, const std::string& msg, int level) {
+void print_hex_array(const __uint128_t arr, const std::string &msg, int level) {
     std::string local_msg;
     for (int i = 0; i < level; i++) {
         local_msg += "\t";
     }
     print_hex(arr, local_msg, false);
+}
+
+
+void print_hex(const uint8_t* str, size_t size, const std::string& msg="") {
+    if (!msg.empty()) {
+        std::cout << msg << "\t:\t";
+    }
+    auto convert_to_hex = [](int x) {
+        char chr;
+        if (x < 10) {
+            chr = (char) (x + '0');
+        } else {
+            chr = (char) (x + 'a' - 10);
+        }
+        return chr;
+    };
+
+    for (size_t i = 0; i < size; i++) {
+        std::cout << convert_to_hex((int)str[i] >> 4) << convert_to_hex((int)str[i] % (1<<4));
+    }
+    std::cout << std::endl;
+}
+
+template<>
+void print_hex_array(uint8_t* arr, const std::string &msg, int level) {
+    if (!msg.empty()) {
+        std::cout << msg << std::endl;
+    }
+    print_hex(arr, 64, "\t");
+}
+
+template<>
+void print_hex_array(const uint8_t* arr, const std::string &msg, int level) {
+    if (!msg.empty()) {
+        std::cout << msg << std::endl;
+    }
+    print_hex(arr, 64, "\t");
+}
+
+template<typename T>
+T convert(const uint8_t *data) {
+    static const size_t size = sizeof(T);
+    static uint8_t arr[size];
+    memcpy(arr, data, size);
+    for (auto i = 0; i < size / 2; i++) {
+        std::swap(arr[i], arr[size - 1 - i]);
+    }
+    return *((T *) arr);
+}
+
+template<typename T>
+uint8_t *deconvert(const T &value, uint8_t *data) {
+    memcpy(data, (uint8_t *) (&value), sizeof(T));
+    for (auto i = 0; i < sizeof(T) / 2; i++) {
+        std::swap(data[i], data[sizeof(T) - 1 - i]);
+    }
+    return data;
+}
+
+template<size_t SIZE>
+uint8_t *copy(const uint8_t *data) {
+    auto copied = new uint8_t[SIZE];
+    memcpy(copied, data, SIZE);
+    return copied;
+}
+
+template<size_t SIZE>
+inline const uint8_t *empty_block() {
+    static auto block = new uint8_t[SIZE];
+    static bool initialized = false;
+    if (!initialized) {
+        memset(block, 0, SIZE);
+    }
+    return block;
+}
+
+template<typename T, size_t SIZE>
+inline const uint8_t *get_block_with_value(T value) {
+    auto block = copy<SIZE>(empty_block<SIZE>());
+    for (size_t i = SIZE; i > 0; i--) {
+        block[i - 1] = (uint8_t)value;
+        value >>= 8;
+    }
+    return block;
 }
 
 };
@@ -134,18 +218,3 @@ void print_hex_array(const __uint128_t &arr, const std::string& msg, int level) 
 //    return block;
 //}
 //
-//__uint128_t convert128(const block_t data) {
-//    static uint8_t arr[16];
-//    memcpy(arr, data, 16);
-//    for(int i = 0; i < 8; i++) {
-//        std::swap(arr[i], arr[15 - i]);
-//    }
-//    return *((__uint128_t*)arr);
-//}
-//
-//void deconvert128(const __uint128_t value, uint8_t *data) {
-//    memcpy(data, (uint8_t*)(&value), 16);
-//    for (int i = 0; i < 8; i++) {
-//        std::swap(data[i], data[15 - i]);
-//    }
-//}
