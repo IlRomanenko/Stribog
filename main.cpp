@@ -5,31 +5,41 @@
 
 #include "constants.h"
 
-using __uint512_t = std::vector<__uint128_t>;
+using __uint512_t = std::array<__uint128_t, 4>;
 
 class Stribog_hash {
 
-    uint64_t linear_transformation(const uint64_t &value) const {
-        const auto &transform_matrix = constants::linear_transformation::get_linear_matrix();
+    __uint128_t linear_transformation(const __uint128_t &value128) const {
+        static const auto &transform_matrix = constants::linear_transformation::get_linear_matrix();
+        auto value1 = (uint64_t)(value128 >> 64);
+        auto value2 = (uint64_t)value128;
 
-        uint64_t result = 0;
+        uint64_t result1 = 0;
+        uint64_t result2 = 0;
         for (int i = 0; i < 64; i++) {
-            if ((value >> i) & 1) {
-                result ^= transform_matrix[i];
+            const auto& value = transform_matrix[i];
+            if (value1 & 1) {
+                result1 ^= value;
             }
+            if (value2 & 1) {
+                result2 ^= value;
+            }
+            value1 >>= 1;
+            value2 >>= 1;
         }
+        auto result = ((__uint128_t)(result1) << 64) | result2;
         return result;
     }
 
     __uint128_t pi_transformation(const __uint128_t &value) const {
-        const auto &pi = constants::pi_transformation::pi;
+        static const auto &pi = constants::pi_transformation::pi;
 
         __uint128_t result = 0;
         __uint128_t mask = 0b11111111;
         size_t offset = 0;
         for (int i = 0; i < 16; i++) {
             auto byte = (uint8_t) ((value & mask) >> offset);
-            result |= (__uint128_t)pi[byte] << offset;
+            result |= (__uint128_t) pi[byte] << offset;
             mask <<= 8;
             offset += 8;
         }
@@ -39,31 +49,27 @@ class Stribog_hash {
 
     __uint512_t s_conversion(const __uint512_t &block) const {
         __uint512_t result;
-        for (const auto &value : block) {
-            result.push_back(pi_transformation(value));
+        for (int i = 0; i < 4; i++) {
+            result[i] = pi_transformation(block[i]);
         }
         return result;
     }
 
     __uint512_t p_conversion(const __uint512_t &block) const {
-        const auto &tau = constants::tau_transformation::tau;
+        static const auto &tau = constants::tau_transformation::tau;
 
-        std::vector<uint8_t> bytes;
+        std::array<uint8_t, 64> bytes = {};
         for (int i = 3; i >= 0; i--) {
             auto value = block[i];
             for (int j = 0; j < 16; j++) {
-                bytes.push_back((uint8_t)value);
+                bytes[16 * i + (15 - j)] = ((uint8_t) value);
                 value >>= 8;
             }
         }
 
-        std::reverse(bytes.begin(), bytes.end());
-        std::vector<uint8_t> replaced;
-//        for (int i = 63; i >= 0; i--) {
-//            replaced.push_back(bytes[tau[i]]);
-//        }
-        for (int i : tau) {
-            replaced.push_back(bytes[i]);
+        std::array<uint8_t, 64> replaced = {};
+        for (int i = 0; i < 64; i++) {
+            replaced[i] = bytes[tau[i]];
         }
 
         __uint512_t result;
@@ -73,7 +79,7 @@ class Stribog_hash {
                 value <<= 8;
                 value |= replaced[j + (3 - i) * 16];
             }
-            result.push_back(value);
+            result[3 - i] = value;
         }
 
         return result;
@@ -81,10 +87,8 @@ class Stribog_hash {
 
     __uint512_t l_conversion(const __uint512_t &block) const {
         __uint512_t result;
-        for (const auto &value : block) {
-            auto first_part = (__uint128_t) linear_transformation((uint64_t) (value >> 64));
-            auto second_part = (__uint128_t) linear_transformation((uint64_t) value);
-            result.push_back((first_part << 64) | second_part);
+        for (int i = 0; i < 4; i++) {
+            result[i] = linear_transformation(block[i]);
         }
         return result;
     }
@@ -92,7 +96,7 @@ class Stribog_hash {
     __uint512_t xor_conversion(const __uint512_t &block1, const __uint512_t &block2) const {
         __uint512_t result;
         for (auto i = 0; i < block1.size(); i++) {
-            result.push_back(block1[i] ^ block2[i]);
+            result[i] = block1[i] ^ block2[i];
         }
         return result;
     }
@@ -162,9 +166,9 @@ class Stribog_hash {
          * < payload >< shift >
          */
         auto shift_size = 128 - bits_length % 128;
-        for (int i = (int)message.size() - 1; i >= 0; i--) {
+        for (int i = (int) message.size() - 1; i >= 0; i--) {
             __uint128_t cur_part = message[i];
-            if (i != (int)message.size() - 1) {
+            if (i != (int) message.size() - 1) {
                 cur_part >>= shift_size;
             }
             __uint128_t prev_part = 0;
@@ -188,7 +192,7 @@ class Stribog_hash {
             std::reverse(message_.begin(), message_.end());
             if (bits_length % 128 != 0) {
                 auto value = message_.back();
-                value |= (__int128_t)1 << (bits_length % 128);
+                value |= (__int128_t) 1 << (bits_length % 128);
                 message_[message_.size() - 1] = value;
             } else {
                 message_.push_back({1});
@@ -209,12 +213,11 @@ class Stribog_hash {
         for (auto i = 0; i < total_blocks; i++) {
             result.emplace_back();
             for (int j = 0; j < 4; j++) {
-                result.back().push_back(message_[i * 4 + j]);
+                result.back()[j] = message_[i * 4 + j];
             }
         }
         return result;
     }
-
 
 
 public:
@@ -256,8 +259,7 @@ public:
         if (hash_bits == 256) {
             h = {h[0], h[1]};
         }
-
-        return h;
+        return {h[0], h[1], h[2], h[3]};
     }
 
 private:
@@ -266,7 +268,7 @@ private:
 };
 
 void test_utils() {
-    const char* message_str = "00112233445566778899AABBCCDDEEFF\0";
+    const char *message_str = "00112233445566778899AABBCCDDEEFF\0";
     auto value = utils::parse_hex<__uint128_t>(message_str);
     utils::print_hex<__uint128_t>(value);
 };
@@ -276,7 +278,7 @@ void test_stribog() {
     std::cout << std::endl << "test_stribog" << std::endl << std::endl;
 
     Stribog_hash stribog({0, 0, 0, 0});
-    const char* message_str = "323130393837363534333231303938373635343332313039383736353433323130393837363534333231303938373635343332313039383736353433323130\0";
+    const char *message_str = "323130393837363534333231303938373635343332313039383736353433323130393837363534333231303938373635343332313039383736353433323130\0";
 
     auto message_length = strlen(message_str);
 
@@ -293,12 +295,13 @@ void test_stribog() {
 
     auto hash = stribog.hash(message, message_length * 4);
 
-    for(const auto& value : hash) {
+    for (const auto &value : hash) {
         utils::print_hex(value);
     }
+    const char *result_hash = "486f64c1917879417fef082b3381a4e211c324f074654c38823a7b76f830ad00fa1fbae42b1285c0352f227524bc9ab16254288dd6863dccd5b9f54a1ad0541b\0";
+    std::cout << result_hash << std::endl;
 
-
-    const size_t SIZE = 10 * 1000;
+    const size_t SIZE = 1 * 1000;
     auto time_begin = std::chrono::steady_clock::now();
     for (int i = 0; i < SIZE; i++) {
         stribog.hash(hash, 512);

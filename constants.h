@@ -4,6 +4,7 @@
 #include <vector>
 #include <string>
 #include <algorithm>
+#include <array>
 
 #include "utils.h"
 
@@ -51,13 +52,17 @@ static const char* string_matrix[] = {
         "70a6a56e2440598e", "3853dc371220a247", "1ca76e95091051ad", "0edd37c48a08a6d8",
         "07e095624504536c", "8d70c431ac02a736", "c83862965601dd1b", "641c314b2b8ee083"};
 
-inline const std::vector<uint64_t> get_linear_matrix() {
-    static std::vector<uint64_t> matrix;
-    if (matrix.empty()) {
-        for(const auto& value : string_matrix) {
-            matrix.push_back(utils::parse_hex<uint64_t>(value));
+inline const std::array<uint64_t, 64> get_linear_matrix() {
+    static std::array<uint64_t, 64> matrix;
+    static bool initialized = false;
+    if (!initialized) {
+        for (int i = 0; i < 64; i++) {
+            matrix[63 - i] = utils::parse_hex<uint64_t>(string_matrix[i]);
         }
-        std::reverse(matrix.begin(), matrix.end());
+//        for(const auto& value : string_matrix) {
+//            matrix.push_back(utils::parse_hex<uint64_t>(value));
+//        }
+//        std::reverse(matrix.begin(), matrix.end());
     }
 
     return matrix;
@@ -82,13 +87,13 @@ static const char* c_values[] = {
         "378ee767f11631bad21380b00449b17acda43c32bcdf1d77f82012d430219f9b5d80ef9d1891cc86e71da4aa88e12852faf417d5d9b21b9948bc924af11bd720"
     };
 
-inline const std::vector<std::vector<__uint128_t> > get_iteration_constants() {
-    static std::vector<std::vector<__uint128_t> > matrix;
+inline const std::vector<std::array<__uint128_t, 4> > get_iteration_constants() {
+    static std::vector<std::array<__uint128_t, 4> > matrix;
     if (matrix.empty()) {
         for(const auto& value : c_values) {
             matrix.emplace_back();
             for (int i = 0; i < 4; i++) {
-                matrix.back().push_back(utils::parse_hex<__uint128_t>(value + 32 * i));
+                matrix.back()[i] = utils::parse_hex<__uint128_t>(value + 32 * i);
             }
         }
     }
