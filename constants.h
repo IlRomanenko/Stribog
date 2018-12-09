@@ -58,14 +58,36 @@ inline const uint64_t* get_linear_matrix() {
         matrix = new uint64_t[64];
         for (int i = 0; i < 64; i++) {
             matrix[63 - i] = utils::parse_hex<uint64_t>(string_matrix[i]);
-            //Теперь необходимо перевернуть байты
+            //Теперь необходимо перевернуть байты, чтобы потом можно было просто копировать в память значение
             matrix[63 - i] = utils::reverse_bytes(matrix[63 - i]);
         }
     }
     return matrix;
 }
 
+// 64x1
+// 4x65536
 static uint64_t linear_transform_matrix[8][256];
+
+inline const auto& precalc_linear_matrix() {
+    const auto& matrix = get_linear_matrix();
+    for (int row = 0; row < 8; row++) {
+
+        for (uint16_t value = 0; value < 256; value++) {
+
+            uint64_t result_xor = 0;
+            for (int b_ind = 0; b_ind < 8; b_ind++) {
+                if (value & (1 << b_ind)) {
+                    result_xor ^= matrix[row * 8 + b_ind];
+                }
+            }
+
+            linear_transform_matrix[row][value] = result_xor;
+        }
+    }
+    return linear_transform_matrix;
+}
+
 
 };
 

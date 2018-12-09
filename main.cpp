@@ -10,29 +10,18 @@ using __uint512_t = std::array<__uint128_t, 4>;
 class Stribog_hash {
 
     inline uint8_t *linear_transformation(uint8_t *block128) const {
-        static const auto &transform_matrix = constants::linear_transformation::get_linear_matrix();
+        static const auto &transform_matrix = constants::linear_transformation::precalc_linear_matrix();
 
         auto value1 = (uint8_t) block128[7];
         auto value2 = (uint8_t) block128[15];
 
         uint64_t result1 = 0;
         uint64_t result2 = 0;
-        for (int i = 0; i < 64; i++) {
-            if (i % 8 == 0) {
-                value1 = block128[7 - i / 8];
-                value2 = block128[15 - i / 8];
-            }
-
-            const auto &value = transform_matrix[i];
-            if (value1 & 1) {
-                result1 ^= value;
-            }
-            if (value2 & 1) {
-                result2 ^= value;
-            }
-            value1 >>= 1;
-            value2 >>= 1;
+        for (int i = 0; i < 8; i++) {
+            result1 ^= transform_matrix[i][block128[7 - i]];
+            result2^= transform_matrix[i][block128[15 - i]];
         }
+
         memcpy(block128, (uint8_t*)(&result1), 8);
         memcpy(block128 + 8, (uint8_t*)(&result2), 8);
         return block128;
@@ -132,15 +121,6 @@ class Stribog_hash {
                 block512_1[i - 1] += 1;
             }
         }
-//
-//        __uint512_t result = {0, 0, 0, 0};
-//        for (int i = 3; i >= 0; i--) {
-//            result[i] = block1[i] + block2[i];
-//            // проверка на переполнение
-//            if (result[i] < block1[i] && i > 0) {
-//                result[i - 1] += 1;
-//            }
-//        }
         return block512_1;
     };
 
@@ -291,7 +271,7 @@ void test_stribog() {
     const char *result_hash = "486f64c1917879417fef082b3381a4e211c324f074654c38823a7b76f830ad00fa1fbae42b1285c0352f227524bc9ab16254288dd6863dccd5b9f54a1ad0541b\0";
     std::cout << result_hash << std::endl;
 
-    const size_t SIZE = 1 * 1000;
+    const size_t SIZE = 10 * 1000;
     auto time_begin = std::chrono::steady_clock::now();
     for (int i = 0; i < SIZE; i++) {
         stribog.hash(hash, 512);
