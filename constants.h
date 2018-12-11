@@ -75,9 +75,11 @@ inline const auto& precalc_linear_matrix() {
 
         for (uint16_t value = 0; value < 256; value++) {
 
+            auto tvalue = constants::pi_transformation::pi[value];
+
             uint64_t result_xor = 0;
             for (int b_ind = 0; b_ind < 8; b_ind++) {
-                if (value & (1 << b_ind)) {
+                if (tvalue & (1 << b_ind)) {
                     result_xor ^= matrix[row * 8 + b_ind];
                 }
             }

@@ -36,9 +36,9 @@ class Stribog_hash {
     }
 
     uint8_t *s_conversion(uint8_t *block512) const {
-        for (int i = 0; i < 4; i++) {
-            pi_transformation(block512 + 16 * i);
-        }
+//        for (int i = 0; i < 4; i++) {
+//            pi_transformation(block512 + 16 * i);
+//        }
         return block512;
     }
 
@@ -49,6 +49,7 @@ class Stribog_hash {
         memcpy(arr, block512, 64);
 
         for (int i = 0; i < 64; i++) {
+//            block512[i] = arr[i / 8 + 8*(i % 8)];
             block512[i] = arr[tau[i]];
         }
         return block512;
@@ -271,7 +272,7 @@ void test_stribog() {
     const char *result_hash = "486f64c1917879417fef082b3381a4e211c324f074654c38823a7b76f830ad00fa1fbae42b1285c0352f227524bc9ab16254288dd6863dccd5b9f54a1ad0541b\0";
     std::cout << result_hash << std::endl;
 
-    const size_t SIZE = 10 * 1000;
+    const size_t SIZE = 5 * 1000 * 1000;
     auto time_begin = std::chrono::steady_clock::now();
     for (int i = 0; i < SIZE; i++) {
         stribog.hash(hash, 512);
