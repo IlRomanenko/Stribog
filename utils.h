@@ -6,6 +6,7 @@
 #include <iostream>
 #include <cstring>
 #include <algorithm>
+#include <vector>
 
 using block_t = uint8_t *;
 
@@ -150,13 +151,20 @@ inline const uint8_t *empty_block() {
     static bool initialized = false;
     if (!initialized) {
         memset(block, 0, SIZE);
+        initialized = true;
     }
     return block;
 }
 
 template<typename T, size_t SIZE>
 inline const uint8_t *get_block_with_value(T value) {
-    auto block = copy<SIZE>(empty_block<SIZE>());
+    static T prev_value;
+    static auto block = copy<SIZE>(empty_block<SIZE>());
+
+    if (value == prev_value) {
+        return block;
+    }
+    prev_value = value;
     for (size_t i = SIZE; i > 0; i--) {
         block[i - 1] = (uint8_t)value;
         value >>= 8;
@@ -174,60 +182,62 @@ inline T reverse_bytes(T value) {
     return *((T*)(memory));
 }
 
+std::vector<__uint128_t> right_shifting(const std::vector<__uint128_t> &message, size_t bits_length) {
+    std::vector<__uint128_t> result;
+
+    /**
+     * xxxxxxxxxxx000000000
+     * < payload >< shift >
+     */
+    auto shift_size = 128 - bits_length % 128;
+    for (int i = (int) message.size() - 1; i >= 0; i--) {
+        __uint128_t cur_part = message[i];
+        if (i != (int) message.size() - 1) {
+            cur_part >>= shift_size;
+        }
+        __uint128_t prev_part = 0;
+        if (i > 0) {
+            prev_part = message[i - 1] & (~((-1) << shift_size));
+        }
+        cur_part |= prev_part << (128 - shift_size);
+        result.push_back(cur_part);
+    }
+    std::reverse(result.begin(), result.end());
+    return result;
+}
+
+uint8_t * add_padding(const std::vector<__uint128_t> &message,
+                                             size_t bits_length) {
+    std::vector<__uint128_t> message_ = right_shifting(message, bits_length);
+
+    if (bits_length % 512 != 0) {
+        std::reverse(message_.begin(), message_.end());
+        if (bits_length % 128 != 0) {
+            auto value = message_.back();
+            value |= (__int128_t) 1 << (bits_length % 128);
+            message_[message_.size() - 1] = value;
+        } else {
+            message_.push_back({1});
+            bits_length += 128;
+        }
+
+        auto need_blocks = (512 - bits_length) / 128;
+        for (auto i = 0; i < need_blocks; i++) {
+            message_.push_back({0});
+        }
+        std::reverse(message_.begin(), message_.end());
+    }
+
+    auto total_blocks = message_.size() / 4;
+
+    auto * result = new uint8_t[total_blocks * 64];
+
+    for (auto i = 0; i < total_blocks; i++) {
+        for (int j = 0; j < 4; j++) {
+            utils::deconvert<__uint128_t>(message_[i * 4 + j], result + j * 16 + i * 64);
+        }
+    }
+    return result;
+}
+
 };
-//
-//
-//std::pair<uint8_t*, size_t> convert_str_to_bytes(const std::string& str) {
-//    auto result = new uint8_t[str.length() * 2];
-//    for (size_t i = 0; i < str.length(); i++) {
-//        result[i * 2] = ((uint8_t)str[i]) >> 4;
-//    }
-//    return std::make_pair(result, str.length() * 2);
-//}
-//
-//void print_hex(const uint8_t* str, int length, const std::string& msg="") {
-//    std::cout.flags(std::ios_base::hex);
-//    std::cout << msg;
-//    for (int i = 0; i < length; i++) {
-//        std::cout << ((int)str[i] >> 4) << ((int)str[i] % (1<<4));
-//    }
-//    std::cout << std::endl;
-//}
-//
-//uint8_t* concat(const uint8_t* str, int length) {
-//    auto result = new uint8_t[length / 2];
-//    for (int i = 0; i < length / 2; i++) {
-//        result[i] = (str[2 * i] << 4) | str[2 * i + 1];
-//    }
-//    return result;
-//}
-//
-//uint8_t* parse_hex_string(const std::string& str) {
-//    auto result = new uint8_t[str.length()];
-//    char chr;
-//    for (size_t i = 0; i < str.length(); i++) {
-//        chr = (char)tolower(str[i]);
-//        if (isdigit(chr)) {
-//            result[i] = (uint8_t)(chr - '0');
-//        } else {
-//            result[i] = (uint8_t)(chr - 'a' + 10);
-//        }
-//    }
-//    return concat(result, (int)str.length());
-//}
-//
-//block_t copy(const block_t block, const size_t length = 16) {
-//    auto result = new uint8_t[length];
-//    memcpy(result + length - 16, block, 16);
-//    return result + length - 16;
-//}
-//
-//
-//template <typename T>
-//T* add2(T *block, T *a) {
-//    for (int i = 0; i < 16 / sizeof(T); i++) {
-//        block[i] ^= a[i];
-//    }
-//    return block;
-//}
-//

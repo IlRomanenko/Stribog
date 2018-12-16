@@ -70,21 +70,24 @@ inline const uint64_t* get_linear_matrix() {
 static uint64_t linear_transform_matrix[8][256];
 
 inline const auto& precalc_linear_matrix() {
-    const auto& matrix = get_linear_matrix();
-    for (int row = 0; row < 8; row++) {
+    static bool initialized = false;
+    if (!initialized) {
+        const auto& matrix = get_linear_matrix();
+        for (int row = 0; row < 8; row++) {
 
-        for (uint16_t value = 0; value < 256; value++) {
+            for (uint16_t value = 0; value < 256; value++) {
 
-            auto tvalue = constants::pi_transformation::pi[value];
+                auto tvalue = constants::pi_transformation::pi[value];
 
-            uint64_t result_xor = 0;
-            for (int b_ind = 0; b_ind < 8; b_ind++) {
-                if (tvalue & (1 << b_ind)) {
-                    result_xor ^= matrix[row * 8 + b_ind];
+                uint64_t result_xor = 0;
+                for (int b_ind = 0; b_ind < 8; b_ind++) {
+                    if (tvalue & (1 << b_ind)) {
+                        result_xor ^= matrix[row * 8 + b_ind];
+                    }
                 }
-            }
 
-            linear_transform_matrix[row][value] = result_xor;
+                linear_transform_matrix[7 - row][value] = result_xor;
+            }
         }
     }
     return linear_transform_matrix;
