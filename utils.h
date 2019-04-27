@@ -11,6 +11,27 @@
 using block_t = uint8_t *;
 
 namespace utils {
+    uint8_t* concat(const uint8_t* str, int length) {
+        auto result = new uint8_t[length / 2];
+        for (int i = 0; i < length / 2; i++) {
+            result[i] = (str[2 * i] << 4) | str[2 * i + 1];
+        }
+        return result;
+    }
+
+    uint8_t* parse_hex_string(const std::string& str) {
+        auto result = new uint8_t[str.length()];
+        char chr;
+        for (size_t i = 0; i < str.length(); i++) {
+            chr = (char)tolower(str[i]);
+            if (isdigit(chr)) {
+                result[i] = (uint8_t)(chr - '0');
+            } else {
+                result[i] = (uint8_t)(chr - 'a' + 10);
+            }
+        }
+        return concat(result, (int)str.length());
+    }
 
 template<typename T>
 T parse_hex(const std::string &hex_str) {

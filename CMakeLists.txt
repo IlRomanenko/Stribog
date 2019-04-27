@@ -3,4 +3,4 @@ project(Stribog)
 
 set(CMAKE_CXX_STANDARD 14)
 
-add_executable(Stribog main.cpp utils.h constants.h)
+add_executable(Stribog main.cpp utils.h constants.h HMAC.h Stribog.h)
